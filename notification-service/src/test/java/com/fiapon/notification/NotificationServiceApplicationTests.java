@@ -1,10 +1,10 @@
-package com.fiapon.tc3;
+package com.fiapon.notification;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class Tc3ApplicationTests {
+class NotificationServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
