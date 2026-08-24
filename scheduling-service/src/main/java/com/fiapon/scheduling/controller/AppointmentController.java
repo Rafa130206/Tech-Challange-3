@@ -2,10 +2,11 @@ package com.fiapon.scheduling.controller;
 
 import com.fiapon.scheduling.dto.AppointmentRequest;
 import com.fiapon.scheduling.dto.AppointmentResponse;
+import com.fiapon.scheduling.security.CustomUserDetails;
 import com.fiapon.scheduling.service.AppointmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,14 +22,14 @@ public class AppointmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
+    @PreAuthorize("hasRole('NURSE')")
     @ResponseStatus(HttpStatus.CREATED)
     public AppointmentResponse create(@RequestBody AppointmentRequest request) {
         return service.create(request);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public AppointmentResponse update(@PathVariable Long id, @RequestBody AppointmentRequest request) {
         return service.update(id, request);
     }
@@ -47,9 +48,8 @@ public class AppointmentController {
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
-    public List<AppointmentResponse> getMyAppointments(Authentication authentication) {
-        Long patientId = Long.valueOf(authentication.getName());
-        return service.getByPatient(patientId);
+    public List<AppointmentResponse> getMyAppointments(@AuthenticationPrincipal CustomUserDetails principal) {
+        return service.getByPatient(principal.getId());
     }
 
 }

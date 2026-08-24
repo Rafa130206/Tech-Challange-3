@@ -1,0 +1,3 @@
+pring.datasource.url=jdbc:postgresql://localhost:5434/scheduling
+spring.datasource.username=changeme
+spring.datasource.password=changeme
