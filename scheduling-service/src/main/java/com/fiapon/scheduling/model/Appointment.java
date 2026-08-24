@@ -30,13 +30,12 @@ public class Appointment {
     public Appointment() {
     }
 
-    public Appointment(Long id, Long patientId, Long doctorId, LocalDateTime dateTime, AppointmentStatus status, String notes) {
-        this.id = id;
+    public Appointment(Long patientId, Long doctorId, LocalDateTime dateTime, String notes) {
         this.patientId = patientId;
         this.doctorId = doctorId;
         this.dateTime = dateTime;
-        this.status = status;
         this.notes = notes;
+        this.status = AppointmentStatus.SCHEDULED;
     }
 
     public Long getId() {
