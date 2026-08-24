@@ -1,0 +1,464 @@
+{
+	"info": {
+		"_postman_id": "9f1a1e2b-7c3d-4a2e-9d3a-4b0a2f0e9a11",
+		"name": "TC3 - Scheduling Service (Roles & Permissions)",
+		"description": "Testa as permissões de acesso por role (DOCTOR, NURSE, PATIENT) do scheduling-service, incluindo os casos que devem funcionar e os que devem ser bloqueados (403).\n\nComo rodar:\n1. Suba o banco: `docker compose up -d`\n2. Suba a aplicação: `cd scheduling-service && mvn spring-boot:run -Dspring-boot.run.profiles=local`\n3. Importe esta collection no Postman\n4. Rode as pastas em ordem (0 -> 1 -> 2 -> 3), ou use o Collection Runner pra rodar tudo de uma vez\n\nUsuários seedados automaticamente pelo DataSeeder na primeira subida:\n- dr.silva / doctor123 (DOCTOR)\n- nurse.souza / nurse123 (NURSE)\n- patient.jose / patient123 (PATIENT, assume-se User.id = 3, ou seja patientId = 3)\n\nA pasta \"1 - Enfermeiro\" cria uma consulta e salva o id numa variável de collection (appointmentId), usada pelas pastas seguintes.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8081", "type": "string" },
+		{ "key": "appointmentId", "value": "", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "0 - Sem autenticacao",
+			"item": [
+				{
+					"name": "GET /appointments sem credenciais (401 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 401 - sem autenticacao deve ser bloqueado', function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "1 - Enfermeiro (nurse.souza)",
+			"item": [
+				{
+					"name": "POST /appointments - registrar consulta (201 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 201 - enfermeiro pode registrar', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"if (pm.response.code === 201) {",
+									"    const body = pm.response.json();",
+									"    pm.collectionVariables.set('appointmentId', body.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "nurse.souza", "type": "string" },
+								{ "key": "password", "value": "nurse123", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-01T10:00:00\",\n    \"notes\": \"checkup de rotina\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				},
+				{
+					"name": "GET /appointments - listar todas (200 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 - enfermeiro pode visualizar', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "nurse.souza", "type": "string" },
+								{ "key": "password", "value": "nurse123", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				},
+				{
+					"name": "PUT /appointments/{id} - BLOQUEADO, enfermeiro nao edita (403 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403 - enfermeiro NAO pode editar', function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "nurse.souza", "type": "string" },
+								{ "key": "password", "value": "nurse123", "type": "string" }
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-02T10:00:00\",\n    \"notes\": \"tentativa de edicao pelo enfermeiro\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{appointmentId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2 - Medico (dr.silva)",
+			"item": [
+				{
+					"name": "GET /appointments - listar todas (200 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 - medico pode visualizar', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "dr.silva", "type": "string" },
+								{ "key": "password", "value": "doctor123", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				},
+				{
+					"name": "GET /appointments/{id} - buscar por id (200 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 - medico pode visualizar por id', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "dr.silva", "type": "string" },
+								{ "key": "password", "value": "doctor123", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{appointmentId}}"]
+						}
+					}
+				},
+				{
+					"name": "PUT /appointments/{id} - editar consulta (200 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 - medico pode editar', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "dr.silva", "type": "string" },
+								{ "key": "password", "value": "doctor123", "type": "string" }
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-02T14:00:00\",\n    \"notes\": \"reagendado pelo medico\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{appointmentId}}"]
+						}
+					}
+				},
+				{
+					"name": "POST /appointments - BLOQUEADO, medico nao registra (403 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403 - medico NAO pode registrar', function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "dr.silva", "type": "string" },
+								{ "key": "password", "value": "doctor123", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-03T10:00:00\",\n    \"notes\": \"tentativa de registro pelo medico\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3 - Paciente (patient.jose)",
+			"item": [
+				{
+					"name": "GET /appointments/me - minhas consultas (200 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 - paciente ve as proprias consultas', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Todas as consultas retornadas pertencem ao paciente logado', function () {",
+									"    const body = pm.response.json();",
+									"    body.forEach(function (item) {",
+									"        pm.expect(item.patientId).to.eql(3);",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "patient.jose", "type": "string" },
+								{ "key": "password", "value": "patient123", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "me"]
+						}
+					}
+				},
+				{
+					"name": "GET /appointments - BLOQUEADO, paciente nao lista todas (403 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403 - paciente NAO pode listar todas', function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "patient.jose", "type": "string" },
+								{ "key": "password", "value": "patient123", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				},
+				{
+					"name": "PUT /appointments/{id} - BLOQUEADO, paciente nao edita (403 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403 - paciente NAO pode editar', function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "patient.jose", "type": "string" },
+								{ "key": "password", "value": "patient123", "type": "string" }
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-04T10:00:00\",\n    \"notes\": \"tentativa de edicao pelo paciente\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{appointmentId}}"]
+						}
+					}
+				},
+				{
+					"name": "POST /appointments - BLOQUEADO, paciente nao registra (403 esperado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403 - paciente NAO pode registrar', function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{ "key": "username", "value": "patient.jose", "type": "string" },
+								{ "key": "password", "value": "patient123", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-05T10:00:00\",\n    \"notes\": \"tentativa de registro pelo paciente\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
