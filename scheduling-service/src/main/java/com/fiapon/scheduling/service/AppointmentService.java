@@ -5,6 +5,7 @@ import com.fiapon.scheduling.dto.AppointmentResponse;
 import com.fiapon.scheduling.exception.AppointmentNotFoundException;
 import com.fiapon.scheduling.model.Appointment;
 import com.fiapon.scheduling.repository.AppointmentRepository;
+import com.fiapon.scheduling.validation.AppointmentValidator;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,12 +14,15 @@ import java.util.List;
 public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
+    private final List<AppointmentValidator> validators;
 
-    public AppointmentService(AppointmentRepository appointmentRepository) {
+    public AppointmentService(AppointmentRepository appointmentRepository, List<AppointmentValidator> validators) {
         this.appointmentRepository = appointmentRepository;
+        this.validators = validators;
     }
 
     public AppointmentResponse create(AppointmentRequest request) {
+        validators.forEach(v -> v.validate(request, null));
         Appointment appointment = new Appointment(
                 request.patientId(),
                 request.doctorId(),
@@ -31,6 +35,7 @@ public class AppointmentService {
     }
 
     public AppointmentResponse update(Long id, AppointmentRequest request) {
+        validators.forEach(v -> v.validate(request, id));
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new AppointmentNotFoundException(id));
         appointment.update(request.dateTime(), request.notes());
