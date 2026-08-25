@@ -1,4 +1,4 @@
-package com.fiapon.scheduling.dto;
+package com.fiapon.scheduling.dto.appointment;
 
 import java.time.LocalDateTime;
 

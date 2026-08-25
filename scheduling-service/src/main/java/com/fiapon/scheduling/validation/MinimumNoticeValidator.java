@@ -1,6 +1,6 @@
 package com.fiapon.scheduling.validation;
 
-import com.fiapon.scheduling.dto.AppointmentRequest;
+import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
 import com.fiapon.scheduling.exception.InvalidAppointmentDateException;
 import org.springframework.stereotype.Component;
 

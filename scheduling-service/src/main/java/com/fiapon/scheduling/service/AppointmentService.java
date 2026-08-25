@@ -1,7 +1,7 @@
 package com.fiapon.scheduling.service;
 
-import com.fiapon.scheduling.dto.AppointmentRequest;
-import com.fiapon.scheduling.dto.AppointmentResponse;
+import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
+import com.fiapon.scheduling.dto.appointment.AppointmentResponse;
 import com.fiapon.scheduling.exception.AppointmentNotFoundException;
 import com.fiapon.scheduling.model.Appointment;
 import com.fiapon.scheduling.repository.AppointmentRepository;
