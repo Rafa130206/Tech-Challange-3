@@ -33,4 +33,18 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(AppointmentConflictException.class)
+    public ProblemDetail handleAppointmentConflict(AppointmentConflictException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Appointment Conflict");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidAppointmentDateException.class)
+    public ProblemDetail handleInvalidAppointmentDate(InvalidAppointmentDateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Invalid Appointment Date");
+        return problem;
+    }
+
 }

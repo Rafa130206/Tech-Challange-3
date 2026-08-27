@@ -1,4 +1,4 @@
-package com.fiapon.scheduling.dto;
+package com.fiapon.scheduling.dto.appointment;
 
 import com.fiapon.scheduling.model.AppointmentStatus;
 

@@ -1,7 +1,7 @@
 package com.fiapon.scheduling.controller;
 
-import com.fiapon.scheduling.dto.AppointmentRequest;
-import com.fiapon.scheduling.dto.AppointmentResponse;
+import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
+import com.fiapon.scheduling.dto.appointment.AppointmentResponse;
 import com.fiapon.scheduling.security.CustomUserDetails;
 import com.fiapon.scheduling.service.AppointmentService;
 import org.springframework.http.HttpStatus;
