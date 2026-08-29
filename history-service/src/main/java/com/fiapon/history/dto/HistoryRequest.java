@@ -7,6 +7,6 @@ public record HistoryRequest(
         Long doctorId,
         Long schedulingId,
         LocalDateTime date,
-        String records
+        String medicalRecords
 ) {
 }
