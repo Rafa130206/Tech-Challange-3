@@ -62,7 +62,8 @@ public class History {
         return medicalRecords;
     }
 
-    public void update(LocalDateTime dateTime, String records) {
+    public void update(Long doctorId, LocalDateTime dateTime, String records) {
+        this.doctorId = doctorId;
         this.date = dateTime;
         this.medicalRecords = records;
     }
