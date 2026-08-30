@@ -16,7 +16,6 @@
 	<modules>
 		<module>scheduling-service</module>
 		<module>notification-service</module>
-		<module>history-service</module>
 	</modules>
 
 </project>
