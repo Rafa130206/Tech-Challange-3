@@ -22,7 +22,7 @@ public class AppointmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('NURSE')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
     @ResponseStatus(HttpStatus.CREATED)
     public AppointmentResponse create(@RequestBody AppointmentRequest request) {
         return service.create(request);
