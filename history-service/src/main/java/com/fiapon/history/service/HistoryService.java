@@ -8,6 +8,7 @@ import com.fiapon.history.repository.HistoryRepository;
 import com.fiapon.history.validation.HistoryValidator;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -27,7 +28,7 @@ public class HistoryService {
                 request.patientId(),
                 request.doctorId(),
                 request.schedulingId(),
-                request.date(),
+                LocalDateTime.parse(request.date()),
                 request.medicalRecords()
         );
 
@@ -41,7 +42,7 @@ public class HistoryService {
         History history = historyRepository.findBySchedulingId(schedulingId)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
 
-        history.update(request.doctorId(), request.date(), request.medicalRecords());
+        history.update(request.doctorId(), LocalDateTime.parse(request.date()), request.medicalRecords());
 
         History saved = historyRepository.save(history);
 

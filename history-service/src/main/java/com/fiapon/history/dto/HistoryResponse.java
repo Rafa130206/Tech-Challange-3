@@ -1,13 +1,11 @@
 package com.fiapon.history.dto;
 
-import java.time.LocalDateTime;
-
 public record HistoryResponse(
         Long id,
         Long patientId,
         Long doctorId,
         Long schedulingId,
-        LocalDateTime date,
+        String date,
         String medicalRecords
 ) {
 
@@ -17,7 +15,7 @@ public record HistoryResponse(
                 history.getPatientId(),
                 history.getDoctorId(),
                 history.getSchedulingId(),
-                history.getDate(),
+                history.getDate().toString(),
                 history.getMedicalRecords()
         );
     }
