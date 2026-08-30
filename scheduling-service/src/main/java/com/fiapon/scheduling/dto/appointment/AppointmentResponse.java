@@ -3,9 +3,10 @@ package com.fiapon.scheduling.dto.appointment;
 import com.fiapon.scheduling.model.AppointmentStatus;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record AppointmentResponse(
-        Long id,
+        UUID id,
         Long patientId,
         Long doctorId,
         LocalDateTime dateTime,

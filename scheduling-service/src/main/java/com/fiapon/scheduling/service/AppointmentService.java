@@ -9,6 +9,7 @@ import com.fiapon.scheduling.validation.AppointmentValidator;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class AppointmentService {
@@ -34,7 +35,7 @@ public class AppointmentService {
         return AppointmentResponse.from(saved);
     }
 
-    public AppointmentResponse update(Long id, AppointmentRequest request) {
+    public AppointmentResponse update(UUID id, AppointmentRequest request) {
         validators.forEach(v -> v.validate(request, id));
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new AppointmentNotFoundException(id));
@@ -44,7 +45,7 @@ public class AppointmentService {
         return AppointmentResponse.from(saved);
     }
 
-    public AppointmentResponse getById(Long id) {
+    public AppointmentResponse getById(UUID id) {
         return appointmentRepository.findById(id)
                 .map(AppointmentResponse::from)
                 .orElseThrow(() -> new AppointmentNotFoundException(id));

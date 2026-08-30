@@ -6,6 +6,7 @@ import com.fiapon.scheduling.repository.AppointmentRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Component
 public class DoctorAvailabilityValidator implements AppointmentValidator {
@@ -19,7 +20,7 @@ public class DoctorAvailabilityValidator implements AppointmentValidator {
     }
 
     @Override
-    public void validate(AppointmentRequest request, Long appointmentIdBeingUpdated) {
+    public void validate(AppointmentRequest request, UUID appointmentIdBeingUpdated) {
         LocalDateTime windowStart = request.dateTime().minusHours(MINIMUM_GAP_HOURS);
         LocalDateTime windowEnd = request.dateTime().plusHours(MINIMUM_GAP_HOURS);
 
