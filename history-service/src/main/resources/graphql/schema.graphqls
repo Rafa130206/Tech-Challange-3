@@ -1,0 +1,29 @@
+type History {
+    id: ID!
+    schedulingId: ID!
+    patientId: ID!
+    doctorId: ID!
+    date: String!
+    medicalRecords: String!
+}
+
+input HistoryInput {
+    schedulingId: ID!
+    patientId: ID!
+    doctorId: ID!
+    date: String!
+    medicalRecords: String!
+}
+
+extend type Query {
+    getAll: [History!]!
+    getBySchedulingId(schedulingId: ID!): History
+    getByPatientId(patientId: ID!): [History!]!
+    getByDoctorId(doctorId: ID!): [History!]!
+}
+
+extend type Mutation {
+    create(input: HistoryInput!): History!
+    update(input: HistoryInput!, schedulingId: ID!): History!
+    delete(schedulingId: ID!): Boolean!
+}
