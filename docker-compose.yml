@@ -76,3 +76,4 @@ services:
 volumes:
   postgres_data:
   mongo-notification-service-data:
+  postgres-history-service-data:
