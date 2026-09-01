@@ -2,9 +2,37 @@
 	"info": {
 		"_postman_id": "9f1a1e2b-7c3d-4a2e-9d3a-4b0a2f0e9a11",
 		"name": "TC3 - Scheduling Service (Roles & Permissions)",
-		"description": "Testa as permissoes de acesso por role (DOCTOR, NURSE, PATIENT) do scheduling-service, incluindo os casos que devem funcionar e os que devem ser bloqueados (403).\n\nComo rodar:\n1. Suba o banco: `docker compose up -d`\n2. Suba a aplicacao: `cd scheduling-service && mvn spring-boot:run -Dspring-boot.run.profiles=local`\n3. Importe esta collection no Postman\n4. Rode as pastas em ordem (0 -> 1 -> 2 -> 3), ou use o Collection Runner pra rodar tudo de uma vez\n\nUsuarios/senhas ficam nas variaveis de collection (aba Variables), nao ficam mais fixos dentro de cada request.\n\nA pasta \"1 - Enfermeiro\" cria uma consulta e salva o id numa variavel de collection (appointmentId), usada pelas pastas seguintes.",
+		"description": "Testa as permissoes de acesso por role (DOCTOR, NURSE, PATIENT) do scheduling-service, incluindo os casos que devem funcionar e os que devem ser bloqueados (403).\n\nComo rodar:\n1. Suba o banco: `docker compose up -d`\n2. Suba a aplicacao: `cd scheduling-service && mvn spring-boot:run -Dspring-boot.run.profiles=local`\n3. Importe esta collection no Postman\n4. Rode as pastas em ordem (0 -> 1 -> 2 -> 3), ou use o Collection Runner pra rodar tudo de uma vez\n\nUsuarios/senhas ficam nas variaveis de collection (aba Variables), nao ficam mais fixos dentro de cada request.\n\nAs datas das consultas sao calculadas dinamicamente por um pre-request script no nivel da collection (sempre no futuro, respeitando a regra de minimo 3 dias de antecedencia) - a collection nao fica desatualizada com a passagem do tempo.\n\nRegras de permissao testadas:\n- POST /appointments: DOCTOR ou NURSE podem registrar\n- PUT /appointments/{id}: so DOCTOR pode editar\n- GET /appointments e /appointments/{id}: DOCTOR ou NURSE\n- GET /appointments/me: so PATIENT, e so ve as proprias consultas\n\nA pasta \"1 - Enfermeiro\" cria a consulta principal e salva o id numa variavel de collection (appointmentId), usada pelas pastas seguintes.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"if (!pm.collectionVariables.get('datesInitialized')) {",
+					"    function addDays(date, days) {",
+					"        const d = new Date(date);",
+					"        d.setUTCDate(d.getUTCDate() + days);",
+					"        return d;",
+					"    }",
+					"    function toLocalDateTime(date, hour) {",
+					"        const d = new Date(date);",
+					"        d.setUTCHours(hour, 0, 0, 0);",
+					"        return d.toISOString().slice(0, 19);",
+					"    }",
+					"",
+					"    const now = new Date();",
+					"    pm.collectionVariables.set('apt1DateTime', toLocalDateTime(addDays(now, 10), 9));",
+					"    pm.collectionVariables.set('apt1EditDateTime', toLocalDateTime(addDays(now, 10), 14));",
+					"    pm.collectionVariables.set('apt2DateTime', toLocalDateTime(addDays(now, 12), 9));",
+					"    pm.collectionVariables.set('datesInitialized', 'true');",
+					"}"
+				]
+			}
+		}
+	],
 	"variable": [
 		{ "key": "baseUrl", "value": "http://localhost:8081", "type": "string" },
 		{ "key": "appointmentId", "value": "", "type": "string" },
@@ -13,7 +41,11 @@
 		{ "key": "doctorUsername", "value": "dr.silva", "type": "string" },
 		{ "key": "doctorPassword", "value": "doctor123", "type": "string" },
 		{ "key": "patientUsername", "value": "patient.jose", "type": "string" },
-		{ "key": "patientPassword", "value": "patient123", "type": "string" }
+		{ "key": "patientPassword", "value": "patient123", "type": "string" },
+		{ "key": "apt1DateTime", "value": "", "type": "string" },
+		{ "key": "apt1EditDateTime", "value": "", "type": "string" },
+		{ "key": "apt2DateTime", "value": "", "type": "string" },
+		{ "key": "datesInitialized", "value": "", "type": "string" }
 	],
 	"item": [
 		{
@@ -83,7 +115,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-01T10:00:00\",\n    \"notes\": \"checkup de rotina\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt1DateTime}}\",\n    \"notes\": \"checkup de rotina\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -154,7 +186,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-02T10:00:00\",\n    \"notes\": \"tentativa de edicao pelo enfermeiro\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt1EditDateTime}}\",\n    \"notes\": \"tentativa de edicao pelo enfermeiro\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -262,7 +294,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-02T14:00:00\",\n    \"notes\": \"reagendado pelo medico\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt1EditDateTime}}\",\n    \"notes\": \"reagendado pelo medico\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -273,15 +305,15 @@
 					}
 				},
 				{
-					"name": "POST /appointments - BLOQUEADO, medico nao registra (403 esperado)",
+					"name": "POST /appointments - medico tambem pode registrar (201 esperado)",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"pm.test('Status 403 - medico NAO pode registrar', function () {",
-									"    pm.response.to.have.status(403);",
+									"pm.test('Status 201 - medico tambem pode registrar', function () {",
+									"    pm.response.to.have.status(201);",
 									"});"
 								]
 							}
@@ -301,7 +333,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-03T10:00:00\",\n    \"notes\": \"tentativa de registro pelo medico\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt2DateTime}}\",\n    \"notes\": \"registrado pelo proprio medico\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -415,7 +447,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-04T10:00:00\",\n    \"notes\": \"tentativa de edicao pelo paciente\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt1EditDateTime}}\",\n    \"notes\": \"tentativa de edicao pelo paciente\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -454,7 +486,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"2026-09-05T10:00:00\",\n    \"notes\": \"tentativa de registro pelo paciente\"\n}",
+							"raw": "{\n    \"patientId\": 3,\n    \"doctorId\": 1,\n    \"dateTime\": \"{{apt2DateTime}}\",\n    \"notes\": \"tentativa de registro pelo paciente\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {

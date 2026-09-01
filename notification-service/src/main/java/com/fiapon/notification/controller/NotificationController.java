@@ -14,11 +14,9 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationListUseCase notificationListUseCase;
-    private final NotificationMapper notificationMapper;
 
-    public NotificationController(NotificationListUseCase notificationListUseCase, NotificationMapper notificationMapper) {
+    public NotificationController(NotificationListUseCase notificationListUseCase) {
         this.notificationListUseCase = notificationListUseCase;
-        this.notificationMapper = notificationMapper;
     }
 
     @GetMapping

@@ -8,6 +8,7 @@ import com.fiapon.scheduling.repository.UserRepository;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneOffset;
 import java.util.Map;
 
 @Component
@@ -45,7 +46,7 @@ public class AppointmentEventPublisher {
                 "patientUsername", patient.getUsername(),
                 "patientName", patient.getName(),
                 "doctorName", doctor.getName(),
-                "scheduledAt", appointment.getDateTime().toString(),
+                "scheduledAt", appointment.getDateTime().atOffset(ZoneOffset.UTC).toString(),
                 "status", appointment.getStatus().name()
         );
 
