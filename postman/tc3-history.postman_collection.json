@@ -1,0 +1,272 @@
+{
+  "info": {
+    "_postman_id": "b2f7c1a4-9d3e-4a11-8c6b-1e5f0a7d2c88",
+    "name": "TC3 - History Service (GraphQL)",
+    "description": "GraphQL CRUD for the history-service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8083", "type": "string" },
+    { "key": "schedulingId", "value": "1", "type": "string" },
+    { "key": "patientId", "value": "10", "type": "string" },
+    { "key": "doctorId", "value": "20", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Mutations",
+      "item": [
+        {
+          "name": "Create history",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('Returns created history id', () => pm.expect(body.data.create.id).to.exist);",
+                  "pm.collectionVariables.set('schedulingId', body.data.create.schedulingId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation CreateHistory($input: HistoryInput!) {\n  create(input: $input) {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"schedulingId\": \"1\",\n    \"patientId\": \"10\",\n    \"doctorId\": \"20\",\n    \"date\": \"2026-08-30T14:30:00\",\n    \"medicalRecords\": \"Routine consultation\"\n  }\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Update history",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('doctorId updated', () => pm.expect(body.data.update.doctorId).to.eql('99'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation UpdateHistory($schedulingId: ID!, $input: HistoryInput!) {\n  update(schedulingId: $schedulingId, input: $input) {\n    id\n    schedulingId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+                "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\",\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"10\",\n    \"doctorId\": \"99\",\n    \"date\": \"2026-08-30T15:00:00\",\n    \"medicalRecords\": \"Follow-up\"\n  }\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Delete history",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('delete returns true', () => pm.expect(body.data.delete).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteHistory($schedulingId: ID!) {\n  delete(schedulingId: $schedulingId)\n}",
+                "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\"\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Queries",
+      "item": [
+        {
+          "name": "Get all",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('data.getAll is an array', () => pm.expect(body.data.getAll).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetAll {\n  getAll {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+                "variables": "{}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Get by scheduling id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('Matches requested schedulingId', () => pm.expect(body.data.getBySchedulingId.schedulingId).to.eql(pm.collectionVariables.get('schedulingId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetByScheduling($schedulingId: ID!) {\n  getBySchedulingId(schedulingId: $schedulingId) {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+                "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\"\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Get by patient id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('data.getByPatientId is an array', () => pm.expect(body.data.getByPatientId).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetByPatient($patientId: ID!) {\n  getByPatientId(patientId: $patientId) {\n    id\n    schedulingId\n    doctorId\n  }\n}",
+                "variables": "{\n  \"patientId\": \"{{patientId}}\"\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Get by doctor id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('No GraphQL errors', () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test('data.getByDoctorId is an array', () => pm.expect(body.data.getByDoctorId).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetByDoctor($doctorId: ID!) {\n  getByDoctorId(doctorId: $doctorId) {\n    id\n    schedulingId\n    patientId\n  }\n}",
+                "variables": "{\n  \"doctorId\": \"{{doctorId}}\"\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error cases",
+      "item": [
+        {
+          "name": "Create - duplicate scheduling (BAD_REQUEST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('Has a GraphQL error', () => pm.expect(body.errors).to.be.an('array'));",
+                  "pm.test('classification is BAD_REQUEST', () => pm.expect(body.errors[0].extensions.classification).to.eql('BAD_REQUEST'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation CreateDuplicate($input: HistoryInput!) {\n  create(input: $input) {\n    id\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"10\",\n    \"doctorId\": \"20\",\n    \"date\": \"2026-08-30T14:30:00\",\n    \"medicalRecords\": \"Duplicate attempt\"\n  }\n}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Create - blank medical records (BAD_REQUEST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('Has a GraphQL error', () => pm.expect(body.errors).to.be.an('array'));",
+                  "pm.test('classification is BAD_REQUEST', () => pm.expect(body.errors[0].extensions.classification).to.eql('BAD_REQUEST'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ {

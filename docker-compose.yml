@@ -43,5 +43,32 @@ services:
     ports:
       - "8082:8082"
 
+  postgres-history-service:
+    image: postgres:16
+    container_name: postgres-history-service
+    environment:
+      POSTGRES_DB: history
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminPostgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-history-service-data:/var/lib/postgresql/data
+
+  history-service:
+    build:
+      context: .
+      dockerfile: history-service/Dockerfile
+    container_name: history-service
+    depends_on:
+      - postgres-history-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-history-service:5432/history
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: adminPostgres
+    ports:
+      - "8083:8083"
+
 volumes:
   mongo-notification-service-data:
+  postgres-history-service-data:
