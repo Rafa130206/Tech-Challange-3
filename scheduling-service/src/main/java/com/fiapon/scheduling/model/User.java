@@ -20,13 +20,17 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
+    @Column(nullable = false)
+    private String name;
+
     public User() {
     }
 
-    public User(String username, String password, UserRole role) {
+    public User(String username, String password, UserRole role, String name) {
         this.username = username;
         this.password = password;
         this.role = role;
+        this.name = name;
     }
 
     public Long getId() {
@@ -43,5 +47,9 @@ public class User {
 
     public UserRole getRole() {
         return role;
+    }
+
+    public String getName() {
+        return name;
     }
 }

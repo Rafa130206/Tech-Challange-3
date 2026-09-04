@@ -2,6 +2,7 @@ package com.fiapon.notification.usecase;
 
 import com.fiapon.notification.entity.Notification;
 import com.fiapon.notification.repository.NotificationRepository;
+import org.bson.types.ObjectId;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -26,8 +27,17 @@ public class NotificationRegisterUseCase {
     ) {
         OffsetDateTime appointmentDate = OffsetDateTime.parse(scheduledAt);
         OffsetDateTime reminderDate = appointmentDate.minusDays(1);
+
+        // If this appointment already has a pending reminder (e.g. it was rescheduled),
+        // reuse that document's id so save() updates it in place instead of creating
+        // a duplicate reminder with the stale date/time.
+        ObjectId existingId = notificationRepository
+                .findByAppointmentIdAndStatus(appointmentId.toString(), "PENDENTE")
+                .map(Notification::getId)
+                .orElse(null);
+
         Notification notification = new Notification(
-                null,
+                existingId,
                 "PENDENTE",
                 null,
                 reminderDate,

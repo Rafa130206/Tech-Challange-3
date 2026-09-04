@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/appointments")
@@ -22,7 +23,7 @@ public class AppointmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('NURSE')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
     @ResponseStatus(HttpStatus.CREATED)
     public AppointmentResponse create(@RequestBody AppointmentRequest request) {
         return service.create(request);
@@ -30,7 +31,7 @@ public class AppointmentController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('DOCTOR')")
-    public AppointmentResponse update(@PathVariable Long id, @RequestBody AppointmentRequest request) {
+    public AppointmentResponse update(@PathVariable UUID id, @RequestBody AppointmentRequest request) {
         return service.update(id, request);
     }
 
@@ -42,7 +43,7 @@ public class AppointmentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
-    public AppointmentResponse getById(@PathVariable Long id) {
+    public AppointmentResponse getById(@PathVariable UUID id) {
         return service.getById(id);
     }
 
