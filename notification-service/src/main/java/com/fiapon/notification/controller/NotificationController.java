@@ -3,6 +3,7 @@ package com.fiapon.notification.controller;
 import com.fiapon.notification.dto.NotificationResponse;
 import com.fiapon.notification.mapper.NotificationMapper;
 import com.fiapon.notification.usecase.NotificationListUseCase;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +23,7 @@ public class NotificationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
     public List<NotificationResponse> list() {
         return notificationListUseCase.list()
                 .stream()

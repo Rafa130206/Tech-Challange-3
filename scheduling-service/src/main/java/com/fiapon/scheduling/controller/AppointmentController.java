@@ -2,11 +2,11 @@ package com.fiapon.scheduling.controller;
 
 import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
 import com.fiapon.scheduling.dto.appointment.AppointmentResponse;
-import com.fiapon.scheduling.security.CustomUserDetails;
 import com.fiapon.scheduling.service.AppointmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,8 +48,8 @@ public class AppointmentController {
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
-    public List<AppointmentResponse> getMyAppointments(@AuthenticationPrincipal CustomUserDetails principal) {
-        return service.getByPatient(principal.getId());
+    public List<AppointmentResponse> getMyAppointments(@AuthenticationPrincipal Jwt jwt) {
+        return service.getByPatient(Long.valueOf(jwt.getSubject()));
     }
 
 }

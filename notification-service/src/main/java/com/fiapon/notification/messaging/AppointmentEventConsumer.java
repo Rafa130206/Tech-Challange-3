@@ -7,7 +7,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.UUID;
 
 @Component
 public class AppointmentEventConsumer {
@@ -24,7 +23,7 @@ public class AppointmentEventConsumer {
     public void consume(String message) throws IOException {
         JsonNode payload = objectMapper.readTree(message);
         notificationRegisterUseCase.registerNotification(
-                UUID.fromString(payload.get("appointmentId").asText()),
+                payload.get("appointmentId").asLong(),
                 payload.get("patientUsername").asText(),
                 payload.get("patientName").asText(),
                 payload.get("doctorName").asText(),

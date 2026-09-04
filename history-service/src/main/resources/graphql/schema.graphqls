@@ -17,6 +17,7 @@ input HistoryInput {
 
 extend type Query {
     getAll: [History!]!
+    myHistory: [History!]!
     getBySchedulingId(schedulingId: ID!): History
     getByPatientId(patientId: ID!): [History!]!
     getByDoctorId(doctorId: ID!): [History!]!
