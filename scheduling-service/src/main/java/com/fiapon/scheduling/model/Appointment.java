@@ -3,14 +3,15 @@ package com.fiapon.scheduling.model;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "appointments")
 public class Appointment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false)
     private Long patientId;
@@ -38,7 +39,7 @@ public class Appointment {
         this.status = AppointmentStatus.SCHEDULED;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 

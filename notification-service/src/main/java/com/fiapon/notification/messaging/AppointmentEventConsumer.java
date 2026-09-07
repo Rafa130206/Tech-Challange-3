@@ -11,11 +11,10 @@ import java.io.IOException;
 @Component
 public class AppointmentEventConsumer {
 
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final NotificationRegisterUseCase notificationRegisterUseCase;
 
-    public AppointmentEventConsumer(ObjectMapper objectMapper, NotificationRegisterUseCase notificationRegisterUseCase) {
-        this.objectMapper = objectMapper;
+    public AppointmentEventConsumer(NotificationRegisterUseCase notificationRegisterUseCase) {
         this.notificationRegisterUseCase = notificationRegisterUseCase;
     }
 

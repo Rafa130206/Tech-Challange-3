@@ -17,9 +17,9 @@ public class DataSeeder {
             if (userRepository.count() > 0) {
                 return;
             }
-            userRepository.save(new User("dr.silva", passwordEncoder.encode("doctor123"), UserRole.DOCTOR));
-            userRepository.save(new User("nurse.souza", passwordEncoder.encode("nurse123"), UserRole.NURSE));
-            userRepository.save(new User("patient.jose", passwordEncoder.encode("patient123"), UserRole.PATIENT));
+            userRepository.save(new User("dr.silva", passwordEncoder.encode("doctor123"), UserRole.DOCTOR, "Dr. Carlos Silva"));
+            userRepository.save(new User("nurse.souza", passwordEncoder.encode("nurse123"), UserRole.NURSE, "Enf. Beatriz Souza"));
+            userRepository.save(new User("patient.jose", passwordEncoder.encode("patient123"), UserRole.PATIENT, "José Oliveira"));
         };
     }
 }
