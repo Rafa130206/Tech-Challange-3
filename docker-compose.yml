@@ -9,6 +9,18 @@ services:
     ports:
       - "8080:8080"
 
+  postgres-scheduling-service:
+    image: postgres:16
+    container_name: postgres-scheduling-service
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-scheduling}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adminPostgres}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-scheduling-service-data:/var/lib/postgresql/data
+
   kafka:
     image: apache/kafka:4.3.1
     container_name: kafka
@@ -49,10 +61,27 @@ services:
       - mongo-notification-service
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_DATA_MONGODB_URI: mongodb://mongo-notification-service:27017/notification-service
+      SPRING_MONGODB_URI: mongodb://mongo-notification-service:27017/notification-service
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-tc3-local-development-secret-key-2026}
     ports:
       - "8082:8082"
+
+  scheduling-service:
+    build:
+      context: .
+      dockerfile: scheduling-service/Dockerfile
+    container_name: scheduling-service
+    depends_on:
+      - kafka
+      - postgres-scheduling-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-scheduling-service:5432/${POSTGRES_DB:-scheduling}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-adminPostgres}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-tc3-local-development-secret-key-2026}
+    ports:
+      - "8081:8081"
 
   postgres-history-service:
     image: postgres:16
@@ -83,4 +112,5 @@ services:
 
 volumes:
   mongo-notification-service-data:
+  postgres-scheduling-service-data:
   postgres-history-service-data:
