@@ -12,26 +12,21 @@ import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.List;
 
-/**
- * The MongoDB Java driver has no built-in codec for java.time.OffsetDateTime
- * (only LocalDateTime/Instant/LocalDate/LocalTime are supported out of the box),
- * so persisting a Notification with OffsetDateTime fields fails with a
- * CodecConfigurationException. These converters teach Spring Data MongoDB how
- * to store OffsetDateTime as a native BSON date and read it back.
- */
 @Configuration
 public class MongoConfig {
 
     @Bean
     public MongoCustomConversions mongoCustomConversions() {
         return new MongoCustomConversions(List.of(
-                new OffsetDateTimeToDateConverter(),
-                new DateToOffsetDateTimeConverter()
+                OffsetDateTimeToDateConverter.INSTANCE,
+                DateToOffsetDateTimeConverter.INSTANCE
         ));
     }
 
     @WritingConverter
-    static class OffsetDateTimeToDateConverter implements Converter<OffsetDateTime, Date> {
+    enum OffsetDateTimeToDateConverter implements Converter<OffsetDateTime, Date> {
+        INSTANCE;
+
         @Override
         public Date convert(OffsetDateTime source) {
             return Date.from(source.toInstant());
@@ -39,7 +34,9 @@ public class MongoConfig {
     }
 
     @ReadingConverter
-    static class DateToOffsetDateTimeConverter implements Converter<Date, OffsetDateTime> {
+    enum DateToOffsetDateTimeConverter implements Converter<Date, OffsetDateTime> {
+        INSTANCE;
+
         @Override
         public OffsetDateTime convert(Date source) {
             return source.toInstant().atOffset(ZoneOffset.UTC);

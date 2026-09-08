@@ -17,14 +17,16 @@ public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
     private final List<AppointmentValidator> validators;
-    private final AppointmentEventPublisher eventPublisher;
+    private final AppointmentEventPublisher appointmentEventPublisher;
 
-    public AppointmentService(AppointmentRepository appointmentRepository,
-                              List<AppointmentValidator> validators,
-                              AppointmentEventPublisher eventPublisher) {
+    public AppointmentService(
+            AppointmentRepository appointmentRepository,
+            List<AppointmentValidator> validators,
+            AppointmentEventPublisher appointmentEventPublisher
+    ) {
         this.appointmentRepository = appointmentRepository;
         this.validators = validators;
-        this.eventPublisher = eventPublisher;
+        this.appointmentEventPublisher = appointmentEventPublisher;
     }
 
     public AppointmentResponse create(AppointmentRequest request) {
@@ -36,7 +38,7 @@ public class AppointmentService {
                 request.notes()
         );
         Appointment saved = appointmentRepository.save(appointment);
-        eventPublisher.publishCreated(saved);
+        appointmentEventPublisher.publishCreated(saved);
         return AppointmentResponse.from(saved);
     }
 
@@ -46,7 +48,7 @@ public class AppointmentService {
                 .orElseThrow(() -> new AppointmentNotFoundException(id));
         appointment.update(request.dateTime(), request.notes());
         Appointment saved = appointmentRepository.save(appointment);
-        eventPublisher.publishUpdated(saved);
+        appointmentEventPublisher.publishUpdated(saved);
         return AppointmentResponse.from(saved);
     }
 

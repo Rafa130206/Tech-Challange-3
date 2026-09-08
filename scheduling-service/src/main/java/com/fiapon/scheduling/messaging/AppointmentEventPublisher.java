@@ -10,51 +10,59 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class AppointmentEventPublisher {
 
-    private static final String TOPIC_CREATED = "agendamento.criado";
-    private static final String TOPIC_UPDATED = "agendamento.atualizado";
+    public static final String CREATED_TOPIC = "agendamento.criado";
+    public static final String UPDATED_TOPIC = "agendamento.atualizado";
 
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public AppointmentEventPublisher(KafkaTemplate<String, String> kafkaTemplate,
-                                     UserRepository userRepository) {
+    public AppointmentEventPublisher(
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper,
+            UserRepository userRepository
+    ) {
         this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
         this.userRepository = userRepository;
     }
 
     public void publishCreated(Appointment appointment) {
-        publish(TOPIC_CREATED, appointment);
+        publish(CREATED_TOPIC, appointment);
     }
 
     public void publishUpdated(Appointment appointment) {
-        publish(TOPIC_UPDATED, appointment);
+        publish(UPDATED_TOPIC, appointment);
     }
 
     private void publish(String topic, Appointment appointment) {
-        User patient = userRepository.findById(appointment.getPatientId())
-                .orElseThrow(() -> new IllegalStateException("Patient not found: " + appointment.getPatientId()));
-        User doctor = userRepository.findById(appointment.getDoctorId())
-                .orElseThrow(() -> new IllegalStateException("Doctor not found: " + appointment.getDoctorId()));
-
+        String patientLabel = userLabel(appointment.getPatientId(), "patient");
         Map<String, Object> payload = Map.of(
-                "appointmentId", appointment.getId().toString(),
-                "patientUsername", patient.getUsername(),
-                "patientName", patient.getName(),
-                "doctorName", doctor.getName(),
+                "eventId", UUID.randomUUID().toString(),
+                "eventType", topic,
+                "appointmentId", appointment.getId(),
+                "patientUsername", patientLabel,
+                "patientName", patientLabel,
+                "doctorName", userLabel(appointment.getDoctorId(), "doctor"),
                 "scheduledAt", appointment.getDateTime().atOffset(ZoneOffset.UTC).toString(),
                 "status", appointment.getStatus().name()
         );
 
         try {
-            String json = objectMapper.writeValueAsString(payload);
-            kafkaTemplate.send(topic, appointment.getId().toString(), json);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize appointment event", e);
+            kafkaTemplate.send(topic, appointment.getId().toString(), objectMapper.writeValueAsString(payload));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Nao foi possivel publicar evento de agendamento", exception);
         }
+    }
+
+    private String userLabel(Long userId, String role) {
+        return userRepository.findById(userId)
+                .map(User::getUsername)
+                .orElse(role + "-" + userId);
     }
 }

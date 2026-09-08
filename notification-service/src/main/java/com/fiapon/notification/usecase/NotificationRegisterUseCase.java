@@ -6,7 +6,6 @@ import org.bson.types.ObjectId;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Component
 public class NotificationRegisterUseCase {
@@ -18,7 +17,7 @@ public class NotificationRegisterUseCase {
     }
 
     public Notification registerNotification(
-            UUID appointmentId,
+            Long appointmentId,
             String patientUsername,
             String patientName,
             String doctorName,

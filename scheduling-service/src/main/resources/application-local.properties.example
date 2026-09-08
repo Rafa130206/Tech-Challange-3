@@ -1,3 +1,3 @@
 spring.datasource.url=jdbc:postgresql://localhost:5434/scheduling
-spring.datasource.username=changeme
-spring.datasource.password=changeme
+spring.datasource.username=admin
+spring.datasource.password=adminPostgres
