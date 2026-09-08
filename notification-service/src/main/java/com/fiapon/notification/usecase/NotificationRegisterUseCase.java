@@ -17,7 +17,7 @@ public class NotificationRegisterUseCase {
     }
 
     public Notification registerNotification(
-            Long appointmentId,
+            String appointmentId,
             String patientUsername,
             String patientName,
             String doctorName,
@@ -31,7 +31,7 @@ public class NotificationRegisterUseCase {
         // reuse that document's id so save() updates it in place instead of creating
         // a duplicate reminder with the stale date/time.
         ObjectId existingId = notificationRepository
-                .findByAppointmentIdAndStatus(appointmentId.toString(), "PENDENTE")
+                .findByAppointmentIdAndStatus(appointmentId, "PENDENTE")
                 .map(Notification::getId)
                 .orElse(null);
 
@@ -45,7 +45,7 @@ public class NotificationRegisterUseCase {
                 "EMAIL",
                 patientName,
                 patientUsername,
-                appointmentId.toString()
+                appointmentId
         );
         return notificationRepository.save(notification);
     }

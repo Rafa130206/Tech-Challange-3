@@ -13,7 +13,7 @@ public interface HistoryRepository extends JpaRepository<History, Long> {
 
     List<History> findByDoctorId(Long doctorId);
 
-    Optional<History> findBySchedulingId(Long schedulingId);
+    Optional<History> findBySchedulingId(String schedulingId);
 
     List<History> findByDate (LocalDateTime relatedDate);
 }

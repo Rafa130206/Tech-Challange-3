@@ -4,7 +4,7 @@ public record HistoryResponse(
         Long id,
         Long patientId,
         Long doctorId,
-        Long schedulingId,
+        String schedulingId,
         String date,
         String medicalRecords
 ) {

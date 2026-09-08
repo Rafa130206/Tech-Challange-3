@@ -15,7 +15,7 @@ public class UniqueHistorySchedulingValidator implements HistoryValidator {
     }
 
     @Override
-    public  void validate(HistoryRequest request, Long schedulingId){
+    public  void validate(HistoryRequest request, String schedulingId){
 
         historyRepository
                 .findBySchedulingId(request.schedulingId())
