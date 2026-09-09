@@ -54,4 +54,11 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(InvalidAppointmentParticipantException.class)
+    public ProblemDetail handleInvalidAppointmentParticipant(InvalidAppointmentParticipantException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Invalid Appointment Participant");
+        return problem;
+    }
+
 }
