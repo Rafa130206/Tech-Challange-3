@@ -2,6 +2,7 @@ package com.fiapon.scheduling.availability;
 
 import com.fiapon.scheduling.dto.availability.AvailableSlotsResponse;
 import com.fiapon.scheduling.model.Appointment;
+import com.fiapon.scheduling.model.AppointmentStatus;
 import com.fiapon.scheduling.model.UserRole;
 import com.fiapon.scheduling.repository.AppointmentRepository;
 import com.fiapon.scheduling.repository.UserRepository;
@@ -36,7 +37,8 @@ public class AvailabilityService {
         // Fetch a bit before/after the day too, so an appointment near midnight
         // still blocks the slots within the minimum gap on this date.
         List<LocalDateTime> bookedDateTimes = appointmentRepository
-                .findByDoctorIdAndDateTimeBetween(doctorId, startOfDay.minusHours(gapHours), endOfDay.plusHours(gapHours))
+                .findByDoctorIdAndDateTimeBetweenAndStatusNot(
+                        doctorId, startOfDay.minusHours(gapHours), endOfDay.plusHours(gapHours), AppointmentStatus.CANCELLED)
                 .stream()
                 .map(Appointment::getDateTime)
                 .toList();

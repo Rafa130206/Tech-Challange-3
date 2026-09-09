@@ -2,6 +2,7 @@ package com.fiapon.scheduling.validation;
 
 import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
 import com.fiapon.scheduling.exception.AppointmentConflictException;
+import com.fiapon.scheduling.model.AppointmentStatus;
 import com.fiapon.scheduling.repository.AppointmentRepository;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,8 @@ public class DoctorAvailabilityValidator implements AppointmentValidator {
         LocalDateTime windowEnd = request.dateTime().plusHours(MINIMUM_GAP_HOURS);
 
         boolean hasConflict = appointmentRepository
-                .findByDoctorIdAndDateTimeBetween(request.doctorId(), windowStart, windowEnd)
+                .findByDoctorIdAndDateTimeBetweenAndStatusNot(
+                        request.doctorId(), windowStart, windowEnd, AppointmentStatus.CANCELLED)
                 .stream()
                 .anyMatch(existing -> !existing.getId().equals(appointmentIdBeingUpdated));
 
