@@ -11,7 +11,7 @@ import java.util.List;
 public class HistoryRequiredFieldsValidator implements HistoryValidator {
 
     @Override
-    public void validate(HistoryRequest request, Long schedulingId){
+    public void validate(HistoryRequest request, String schedulingId){
         List<String> missingFields = new ArrayList<String>();
 
         if (request.doctorId() == null){

@@ -4,5 +4,5 @@ import com.fiapon.history.dto.HistoryRequest;
 
 public interface HistoryValidator {
 
-    void validate(HistoryRequest request, Long schedulingId);
+    void validate(HistoryRequest request, String schedulingId);
 }

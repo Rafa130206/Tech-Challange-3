@@ -35,7 +35,7 @@ public class HistoryController {
 
     @QueryMapping
     @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
-    public HistoryResponse getBySchedulingId(@Argument Long schedulingId){
+    public HistoryResponse getBySchedulingId(@Argument String schedulingId){
         return historyService.getBySchedulingId(schedulingId);
     }
 
@@ -60,13 +60,13 @@ public class HistoryController {
 
     @MutationMapping
     @PreAuthorize("hasRole('DOCTOR')")
-    public HistoryResponse update (@Argument HistoryRequest input, @Argument Long schedulingId){
+    public HistoryResponse update (@Argument HistoryRequest input, @Argument String schedulingId){
         return historyService.update(input, schedulingId);
     }
 
     @MutationMapping
     @PreAuthorize("hasRole('DOCTOR')")
-    public Boolean delete (@Argument Long schedulingId){
+    public Boolean delete (@Argument String schedulingId){
         historyService.delete(schedulingId);
         return true;
     }

@@ -37,7 +37,7 @@ public class HistoryService {
         return HistoryResponse.from(saved);
     }
 
-    public HistoryResponse update(HistoryRequest request, Long schedulingId){
+    public HistoryResponse update(HistoryRequest request, String schedulingId){
         validators.forEach(v -> v.validate(request, schedulingId));
         History history = historyRepository.findBySchedulingId(schedulingId)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
@@ -68,13 +68,13 @@ public class HistoryService {
                 .toList();
     }
 
-    public HistoryResponse getBySchedulingId(Long schedulingId) {
+    public HistoryResponse getBySchedulingId(String schedulingId) {
         return historyRepository.findBySchedulingId(schedulingId)
                 .map(HistoryResponse::from)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
     }
 
-    public void delete (Long schedulingId){
+    public void delete (String schedulingId){
         History history = historyRepository.findBySchedulingId(schedulingId)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
 
