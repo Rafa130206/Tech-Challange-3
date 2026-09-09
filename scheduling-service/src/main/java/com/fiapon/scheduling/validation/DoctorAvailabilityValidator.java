@@ -11,7 +11,7 @@ import java.util.UUID;
 @Component
 public class DoctorAvailabilityValidator implements AppointmentValidator {
 
-    private static final long MINIMUM_GAP_HOURS = 1;
+    public static final long MINIMUM_GAP_HOURS = 1;
 
     private final AppointmentRepository appointmentRepository;
 

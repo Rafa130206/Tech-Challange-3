@@ -1,17 +1,17 @@
 package com.fiapon.scheduling.availability;
 
 import com.fiapon.scheduling.dto.availability.AvailableSlotsResponse;
+import com.fiapon.scheduling.model.Appointment;
 import com.fiapon.scheduling.model.UserRole;
 import com.fiapon.scheduling.repository.AppointmentRepository;
 import com.fiapon.scheduling.repository.UserRepository;
+import com.fiapon.scheduling.validation.DoctorAvailabilityValidator;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class AvailabilityService {
@@ -29,17 +29,26 @@ public class AvailabilityService {
     }
 
     public AvailableSlotsResponse getAvailability(Long doctorId, LocalDate date) {
+        long gapHours = DoctorAvailabilityValidator.MINIMUM_GAP_HOURS;
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
 
-        Set<LocalTime> bookedTimes = appointmentRepository
-                .findByDoctorIdAndDateTimeBetween(doctorId, startOfDay, endOfDay)
+        // Fetch a bit before/after the day too, so an appointment near midnight
+        // still blocks the slots within the minimum gap on this date.
+        List<LocalDateTime> bookedDateTimes = appointmentRepository
+                .findByDoctorIdAndDateTimeBetween(doctorId, startOfDay.minusHours(gapHours), endOfDay.plusHours(gapHours))
                 .stream()
-                .map(a -> a.getDateTime().toLocalTime())
-                .collect(Collectors.toSet());
+                .map(Appointment::getDateTime)
+                .toList();
 
         List<LocalTime> availableSlots = slotGenerator.generate().stream()
-                .filter(slot -> !bookedTimes.contains(slot))
+                .filter(slot -> {
+                    LocalDateTime slotDateTime = date.atTime(slot);
+                    LocalDateTime windowStart = slotDateTime.minusHours(gapHours);
+                    LocalDateTime windowEnd = slotDateTime.plusHours(gapHours);
+                    return bookedDateTimes.stream().noneMatch(
+                            booked -> !booked.isBefore(windowStart) && !booked.isAfter(windowEnd));
+                })
                 .toList();
 
         return new AvailableSlotsResponse(doctorId, date, availableSlots);
