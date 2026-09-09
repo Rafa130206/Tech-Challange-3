@@ -14,6 +14,9 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,12 +55,24 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(properties);
     }
 
+    // Without this, a listener exception (a malformed/missing field, for example) makes Spring
+    // Kafka retry that same record forever and never advance the partition's offset — silently
+    // blocking every message that arrives after it. Retry a few times, then publish the record
+    // to a "<topic>-dlt" topic instead so the pipeline keeps moving and the failure is visible.
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
+    }
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> consumerFactory
+            ConsumerFactory<String, String> consumerFactory,
+            DefaultErrorHandler kafkaErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(kafkaErrorHandler);
         return factory;
     }
 }

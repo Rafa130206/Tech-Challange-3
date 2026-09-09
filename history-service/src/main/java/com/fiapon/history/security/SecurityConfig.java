@@ -55,9 +55,12 @@ public class SecurityConfig {
         authoritiesConverter.setAuthoritiesClaimName("roles");
         authoritiesConverter.setAuthorityPrefix("ROLE_");
 
-        return jwt -> {
-            Collection<GrantedAuthority> grantedAuthorities = authoritiesConverter.convert(jwt);
-            return new JwtAuthenticationToken(jwt, grantedAuthorities, jwt.getSubject());
+        return new Converter<Jwt, JwtAuthenticationToken>() {
+            @Override
+            public JwtAuthenticationToken convert(Jwt jwt) {
+                Collection<GrantedAuthority> grantedAuthorities = authoritiesConverter.convert(jwt);
+                return new JwtAuthenticationToken(jwt, grantedAuthorities, jwt.getSubject());
+            }
         };
     }
 

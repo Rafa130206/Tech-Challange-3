@@ -3,12 +3,15 @@ package com.fiapon.history.service;
 import com.fiapon.history.dto.HistoryRequest;
 import com.fiapon.history.dto.HistoryResponse;
 import com.fiapon.history.exceptions.HistoryNotFoundException;
+import com.fiapon.history.exceptions.InvalidHistoryDataException;
 import com.fiapon.history.model.History;
 import com.fiapon.history.repository.HistoryRepository;
 import com.fiapon.history.validation.HistoryValidator;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
@@ -28,7 +31,7 @@ public class HistoryService {
                 request.patientId(),
                 request.doctorId(),
                 request.schedulingId(),
-                LocalDateTime.parse(request.date()),
+                parseDate(request.date()),
                 request.medicalRecords()
         );
 
@@ -37,12 +40,12 @@ public class HistoryService {
         return HistoryResponse.from(saved);
     }
 
-    public HistoryResponse update(HistoryRequest request, Long schedulingId){
+    public HistoryResponse update(HistoryRequest request, String schedulingId){
         validators.forEach(v -> v.validate(request, schedulingId));
         History history = historyRepository.findBySchedulingId(schedulingId)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
 
-        history.update(request.doctorId(), LocalDateTime.parse(request.date()), request.medicalRecords());
+        history.update(request.doctorId(), parseDate(request.date()), request.medicalRecords());
 
         History saved = historyRepository.save(history);
 
@@ -68,16 +71,31 @@ public class HistoryService {
                 .toList();
     }
 
-    public HistoryResponse getBySchedulingId(Long schedulingId) {
+    public HistoryResponse getBySchedulingId(String schedulingId) {
         return historyRepository.findBySchedulingId(schedulingId)
                 .map(HistoryResponse::from)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
     }
 
-    public void delete (Long schedulingId){
+    public void delete (String schedulingId){
         History history = historyRepository.findBySchedulingId(schedulingId)
                 .orElseThrow(() -> new HistoryNotFoundException(schedulingId));
 
         historyRepository.delete(history);
+    }
+
+    // Appointment/notification dates flow through the system as UTC-offset strings
+    // (e.g. "2026-10-15T10:00:00Z"), but a plain "2026-10-15T10:00:00" should keep working
+    // too. Try the offset form first, then fall back to a bare LocalDateTime.
+    private LocalDateTime parseDate(String date) {
+        try {
+            return OffsetDateTime.parse(date).toLocalDateTime();
+        } catch (DateTimeParseException offsetParseFailure) {
+            try {
+                return LocalDateTime.parse(date);
+            } catch (DateTimeParseException localParseFailure) {
+                throw new InvalidHistoryDataException("date '" + date + "' is not a valid ISO-8601 date-time");
+            }
+        }
     }
 }

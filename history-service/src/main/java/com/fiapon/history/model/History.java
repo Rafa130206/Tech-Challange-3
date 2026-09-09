@@ -19,7 +19,7 @@ public class History {
     private Long doctorId;
 
     @Column(nullable = false, unique = true)
-    private Long schedulingId;
+    private String schedulingId;
 
     @Column(nullable = false)
     private LocalDateTime date;
@@ -30,7 +30,7 @@ public class History {
     public History(){
     }
 
-    public History(Long patientId, Long doctorId, Long schedulingId, LocalDateTime date, String medicalRecords) {
+    public History(Long patientId, Long doctorId, String schedulingId, LocalDateTime date, String medicalRecords) {
         this.patientId = patientId;
         this.doctorId = doctorId;
         this.schedulingId = schedulingId;
@@ -50,7 +50,7 @@ public class History {
         return doctorId;
     }
 
-    public Long getSchedulingId() {
+    public String getSchedulingId() {
         return schedulingId;
     }
 

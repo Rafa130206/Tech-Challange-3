@@ -1,7 +1,7 @@
 package com.fiapon.history.exceptions;
 
 public class HistoryNotFoundException extends RuntimeException {
-    public HistoryNotFoundException(Long id) {
+    public HistoryNotFoundException(String id) {
         super("History not found: " + id);
     }
 }

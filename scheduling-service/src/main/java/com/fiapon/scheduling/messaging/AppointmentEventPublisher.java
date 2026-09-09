@@ -41,14 +41,16 @@ public class AppointmentEventPublisher {
     }
 
     private void publish(String topic, Appointment appointment) {
-        String patientLabel = userLabel(appointment.getPatientId(), "patient");
+        User patient = userRepository.findById(appointment.getPatientId()).orElse(null);
+        User doctor = userRepository.findById(appointment.getDoctorId()).orElse(null);
+
         Map<String, Object> payload = Map.of(
                 "eventId", UUID.randomUUID().toString(),
                 "eventType", topic,
                 "appointmentId", appointment.getId(),
-                "patientUsername", patientLabel,
-                "patientName", patientLabel,
-                "doctorName", userLabel(appointment.getDoctorId(), "doctor"),
+                "patientUsername", patient != null ? patient.getUsername() : "patient-" + appointment.getPatientId(),
+                "patientName", patient != null ? patient.getName() : "patient-" + appointment.getPatientId(),
+                "doctorName", doctor != null ? doctor.getName() : "doctor-" + appointment.getDoctorId(),
                 "scheduledAt", appointment.getDateTime().atOffset(ZoneOffset.UTC).toString(),
                 "status", appointment.getStatus().name()
         );
@@ -58,11 +60,5 @@ public class AppointmentEventPublisher {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Nao foi possivel publicar evento de agendamento", exception);
         }
-    }
-
-    private String userLabel(Long userId, String role) {
-        return userRepository.findById(userId)
-                .map(User::getUsername)
-                .orElse(role + "-" + userId);
     }
 }
