@@ -99,18 +99,17 @@ services:
   history-service:
     build:
       context: .
-      dockerfile: scheduling-service/Dockerfile
-    container_name: scheduling-service
+      dockerfile: history-service/Dockerfile
+    container_name: history-service
     depends_on:
-      - postgres
-      - kafka
+      - postgres-history-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-history-service:5432/history
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: adminPostgres
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-tc3-local-development-secret-key-2026}
     ports:
-      - "8081:8081"
+      - "8083:8083"
 
 volumes:
   postgres_data:

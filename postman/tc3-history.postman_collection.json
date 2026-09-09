@@ -1,23 +1,392 @@
 {
-  "info": {"_postman_id": "b2f7c1a4-9d3e-4a11-8c6b-1e5f0a7d2c88", "name": "TC3 - History Service (GraphQL and JWT)", "description": "Testa o prontuario GraphQL e as permissoes de cada role. Rode a pasta 0 antes das demais.", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
-  "variable": [{"key": "authBaseUrl", "value": "http://localhost:8080", "type": "string"}, {"key": "baseUrl", "value": "http://localhost:8083", "type": "string"}, {"key": "schedulingId", "value": "9001", "type": "string"}, {"key": "doctorToken", "value": "", "type": "string"}, {"key": "nurseToken", "value": "", "type": "string"}, {"key": "patientToken", "value": "", "type": "string"}],
+  "info": {
+    "_postman_id": "e1a9c4d2-6b7f-4c3a-9f10-2d8e5b7a4c61",
+    "name": "TC3 - History Service (GraphQL + JWT) - Completa",
+    "description": "Testa todas as operacoes GraphQL do history-service e as regras de autorizacao por role.\n\nComo usar:\n1. Suba os servicos: `docker compose up --build auth-service history-service` (auth em :8080, history em :8083).\n2. Rode a pasta '0 - Tokens JWT' inteira uma vez (Runner ou uma a uma). Ela grava doctorToken / nurseToken / patientToken nas variaveis da collection.\n3. Rode a pasta '1 - Enfermeiro (NURSE)' > 'Criar prontuario (happy path)' para semear um registro; ela grava o schedulingId usado.\n4. Rode as demais pastas na ordem.\n\nEndpoint GraphQL: {{baseUrl}}/graphql | GraphiQL: {{baseUrl}}/graphiql\n\nRegras exercitadas:\n- create: somente NURSE\n- update / delete: somente DOCTOR (chaveados por schedulingId)\n- getAll / getBySchedulingId / getByPatientId / getByDoctorId: DOCTOR ou NURSE\n- myHistory: somente PATIENT, e retorna apenas os registros do proprio paciente (patientId = subject do JWT)\n- 1 agendamento -> no maximo 1 historico (schedulingId unico)\n- campos obrigatorios: schedulingId, patientId, doctorId, date (ISO-8601), medicalRecords (nao-branco)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "authBaseUrl", "value": "http://localhost:8080", "type": "string"},
+    {"key": "baseUrl", "value": "http://localhost:8083", "type": "string"},
+    {"key": "schedulingId", "value": "9001", "type": "string"},
+    {"key": "patientId", "value": "3", "type": "string"},
+    {"key": "doctorId", "value": "1", "type": "string"},
+    {"key": "doctorToken", "value": "", "type": "string"},
+    {"key": "nurseToken", "value": "", "type": "string"},
+    {"key": "patientToken", "value": "", "type": "string"},
+    {"key": "nowIso", "value": "", "type": "string"}
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// data/hora local ISO-8601 sem timezone, formato aceito por LocalDateTime.parse",
+          "const d = new Date();",
+          "const pad = n => String(n).padStart(2, '0');",
+          "const iso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;",
+          "pm.collectionVariables.set('nowIso', iso);"
+        ]
+      }
+    }
+  ],
   "item": [
-    {"name": "0 - Obter tokens JWT", "item": [
-      {"name": "Medico", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.collectionVariables.set('doctorToken', pm.response.json().accessToken);"]}}], "request": {"auth": {"type": "basic", "basic": [{"key": "username", "value": "dr.silva", "type": "string"}, {"key": "password", "value": "doctor123", "type": "string"}]}, "method": "POST", "url": "{{authBaseUrl}}/auth/token"}},
-      {"name": "Enfermeiro", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.collectionVariables.set('nurseToken', pm.response.json().accessToken);"]}}], "request": {"auth": {"type": "basic", "basic": [{"key": "username", "value": "nurse.souza", "type": "string"}, {"key": "password", "value": "nurse123", "type": "string"}]}, "method": "POST", "url": "{{authBaseUrl}}/auth/token"}},
-      {"name": "Paciente", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.collectionVariables.set('patientToken', pm.response.json().accessToken);"]}}], "request": {"auth": {"type": "basic", "basic": [{"key": "username", "value": "patient.jose", "type": "string"}, {"key": "password", "value": "patient123", "type": "string"}]}, "method": "POST", "url": "{{authBaseUrl}}/auth/token"}}
-    ]},
-    {"name": "1 - Enfermeiro", "item": [
-      {"name": "Criar prontuario", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.test('Sem erro GraphQL', () => pm.expect(body.errors).to.be.undefined);", "pm.test('Prontuario criado', () => pm.expect(body.data.create.id).to.exist);"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "mutation Create($input: HistoryInput!) { create(input: $input) { id schedulingId patientId } }", "variables": "{\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"3\",\n    \"doctorId\": \"1\",\n    \"date\": \"2030-12-20T11:00:00\",\n    \"medicalRecords\": \"Consulta registrada pelo enfermeiro\"\n  }\n}"}}, "url": "{{baseUrl}}/graphql"}},
-      {"name": "Excluir prontuario bloqueado para enfermeiro", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Erro GraphQL de autorizacao', () => pm.expect(pm.response.json().errors).to.be.an('array'));"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "mutation { delete(schedulingId: \"{{schedulingId}}\") }", "variables": "{}"}}, "url": "{{baseUrl}}/graphql"}}
-    ]},
-    {"name": "2 - Medico", "item": [
-      {"name": "Consultar prontuarios", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.test('Sem erro GraphQL', () => pm.expect(body.errors).to.be.undefined);", "pm.test('Retorna lista', () => pm.expect(body.data.getAll).to.be.an('array'));"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "query { getAll { id schedulingId patientId doctorId } }", "variables": "{}"}}, "url": "{{baseUrl}}/graphql"}},
-      {"name": "Atualizar prontuario", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.test('Sem erro GraphQL', () => pm.expect(body.errors).to.be.undefined);", "pm.test('Prontuario atualizado', () => pm.expect(body.data.update.medicalRecords).to.eql('Atualizado pelo medico'));"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "mutation Update($id: ID!, $input: HistoryInput!) { update(schedulingId: $id, input: $input) { medicalRecords } }", "variables": "{\n  \"id\": \"{{schedulingId}}\",\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"3\",\n    \"doctorId\": \"1\",\n    \"date\": \"2030-12-20T11:30:00\",\n    \"medicalRecords\": \"Atualizado pelo medico\"\n  }\n}"}}, "url": "{{baseUrl}}/graphql"}}
-    ]},
-    {"name": "3 - Paciente", "item": [
-      {"name": "myHistory retorna somente registros proprios", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.test('Sem erro GraphQL', () => pm.expect(body.errors).to.be.undefined);", "body.data.myHistory.forEach(item => pm.expect(item.patientId).to.eql('3'));"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "query { myHistory { id schedulingId patientId doctorId medicalRecords } }", "variables": "{}"}}, "url": "{{baseUrl}}/graphql"}},
-      {"name": "getAll bloqueado para paciente", "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Erro GraphQL de autorizacao', () => pm.expect(pm.response.json().errors).to.be.an('array'));"]}}], "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]}, "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "graphql", "graphql": {"query": "query { getAll { id } }", "variables": "{}"}}, "url": "{{baseUrl}}/graphql"}}
-    ]}
+    {
+      "name": "0 - Tokens JWT",
+      "description": "Emite os tokens via auth-service (Basic Auth). Rode os 3 antes de qualquer outra pasta.",
+      "item": [
+        {
+          "name": "Token - Medico (dr.silva)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Retorna JWT Bearer', () => { pm.expect(body.tokenType).to.eql('Bearer'); pm.expect(body.accessToken).to.be.a('string'); });",
+            "pm.collectionVariables.set('doctorToken', body.accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "dr.silva", "type": "string"}, {"key": "password", "value": "doctor123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        },
+        {
+          "name": "Token - Enfermeiro (nurse.souza)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('nurseToken', pm.response.json().accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "nurse.souza", "type": "string"}, {"key": "password", "value": "nurse123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        },
+        {
+          "name": "Token - Paciente (patient.jose)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('patientToken', pm.response.json().accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "patient.jose", "type": "string"}, {"key": "password", "value": "patient123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 - Enfermeiro (NURSE)",
+      "item": [
+        {
+          "name": "Criar prontuario (happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Prontuario criado', () => { pm.expect(body.data.create.id).to.exist; pm.expect(body.data.create.schedulingId).to.eql(pm.collectionVariables.get('schedulingId')); });"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Create($input: HistoryInput!) {\n  create(input: $input) {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+              "variables": "{\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"Queixa de cefaleia ha 3 dias. Sem sinais de alarme. Registrado pela enfermagem.\"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Criar duplicado no mesmo schedulingId (erro)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Retorna erro GraphQL', () => pm.expect(body.errors).to.be.an('array').that.is.not.empty);",
+            "pm.test('Mensagem indica duplicidade', () => pm.expect(JSON.stringify(body.errors).toLowerCase()).to.include('already has a history'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Create($input: HistoryInput!) { create(input: $input) { id } }",
+              "variables": "{\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"Segunda tentativa\"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Criar sem campos obrigatorios (erro de validacao)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Retorna erro GraphQL', () => pm.expect(body.errors).to.be.an('array').that.is.not.empty);",
+            "pm.test('Mensagem lista campos faltantes', () => pm.expect(JSON.stringify(body.errors).toLowerCase()).to.include('missing fields'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Create($input: HistoryInput!) { create(input: $input) { id } }",
+              "variables": "{\n  \"input\": {\n    \"schedulingId\": \"9099\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"   \"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Atualizar bloqueado para NURSE (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Erro GraphQL de autorizacao', () => pm.expect(body.errors).to.be.an('array').that.is.not.empty);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Update($schedulingId: ID!, $input: HistoryInput!) { update(schedulingId: $schedulingId, input: $input) { id } }",
+              "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\",\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"tentativa nurse\"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Excluir bloqueado para NURSE (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('Erro GraphQL de autorizacao', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Delete($schedulingId: ID!) { delete(schedulingId: $schedulingId) }",
+              "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\"\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Medico (DOCTOR)",
+      "item": [
+        {
+          "name": "getAll",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Retorna lista', () => pm.expect(body.data.getAll).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query {\n  getAll {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+              "variables": "{}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getBySchedulingId",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Registro corresponde ao schedulingId', () => pm.expect(body.data.getBySchedulingId.schedulingId).to.eql(pm.collectionVariables.get('schedulingId')));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query GetBySched($schedulingId: ID!) {\n  getBySchedulingId(schedulingId: $schedulingId) {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+              "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\"\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getByPatientId",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Todos do mesmo paciente', () => body.data.getByPatientId.forEach(h => pm.expect(h.patientId).to.eql(pm.collectionVariables.get('patientId'))));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query GetByPatient($patientId: ID!) {\n  getByPatientId(patientId: $patientId) {\n    id\n    schedulingId\n    patientId\n    doctorId\n  }\n}",
+              "variables": "{\n  \"patientId\": \"{{patientId}}\"\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getByDoctorId",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Todos do mesmo medico', () => body.data.getByDoctorId.forEach(h => pm.expect(h.doctorId).to.eql(pm.collectionVariables.get('doctorId'))));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query GetByDoctor($doctorId: ID!) {\n  getByDoctorId(doctorId: $doctorId) {\n    id\n    schedulingId\n    doctorId\n  }\n}",
+              "variables": "{\n  \"doctorId\": \"{{doctorId}}\"\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Atualizar prontuario",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('medicalRecords atualizado', () => pm.expect(body.data.update.medicalRecords).to.include('Evolucao'));",
+            "pm.test('patientId inalterado', () => pm.expect(body.data.update.patientId).to.eql(pm.collectionVariables.get('patientId')));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Update($schedulingId: ID!, $input: HistoryInput!) {\n  update(schedulingId: $schedulingId, input: $input) {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+              "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\",\n  \"input\": {\n    \"schedulingId\": \"{{schedulingId}}\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"Evolucao: paciente refere melhora apos analgesico. Mantido acompanhamento.\"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getBySchedulingId inexistente (HistoryNotFound)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Retorna erro GraphQL', () => pm.expect(body.errors).to.be.an('array').that.is.not.empty);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query { getBySchedulingId(schedulingId: \"99999999\") { id } }",
+              "variables": "{}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Paciente (PATIENT)",
+      "item": [
+        {
+          "name": "myHistory retorna somente registros proprios",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Somente registros do subject do token', () => body.data.myHistory.forEach(h => pm.expect(h.patientId).to.eql(pm.collectionVariables.get('patientId'))));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "query {\n  myHistory {\n    id\n    schedulingId\n    patientId\n    doctorId\n    date\n    medicalRecords\n  }\n}",
+              "variables": "{}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getAll bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('Erro GraphQL de autorizacao', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {"query": "query { getAll { id } }", "variables": "{}"}},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "create bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('Erro GraphQL de autorizacao', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Create($input: HistoryInput!) { create(input: $input) { id } }",
+              "variables": "{\n  \"input\": {\n    \"schedulingId\": \"9200\",\n    \"patientId\": \"{{patientId}}\",\n    \"doctorId\": \"{{doctorId}}\",\n    \"date\": \"{{nowIso}}\",\n    \"medicalRecords\": \"tentativa paciente\"\n  }\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Sem autenticacao",
+      "item": [
+        {
+          "name": "getAll sem token (401)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {"query": "query { getAll { id } }", "variables": "{}"}},
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "getAll com token invalido (401)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "eyJhbGciOiJIUzI1NiJ9.invalido.assinatura", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {"query": "query { getAll { id } }", "variables": "{}"}},
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Limpeza (DOCTOR)",
+      "item": [
+        {
+          "name": "delete do schedulingId de teste",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "const body = pm.response.json();",
+            "pm.test('Sem erro GraphQL', () => pm.expect(body.errors, JSON.stringify(body.errors)).to.be.undefined);",
+            "pm.test('Retorna true', () => pm.expect(body.data.delete).to.eql(true));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "graphql", "graphql": {
+              "query": "mutation Delete($schedulingId: ID!) { delete(schedulingId: $schedulingId) }",
+              "variables": "{\n  \"schedulingId\": \"{{schedulingId}}\"\n}"
+            }},
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    }
   ]
 }
