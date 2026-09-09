@@ -22,7 +22,7 @@ public class AppointmentEventConsumer {
     public void consume(String message) throws IOException {
         JsonNode payload = objectMapper.readTree(message);
         notificationRegisterUseCase.registerNotification(
-                payload.get("appointmentId").asLong(),
+                payload.get("appointmentId").asText(),
                 payload.get("patientUsername").asText(),
                 payload.get("patientName").asText(),
                 payload.get("doctorName").asText(),
