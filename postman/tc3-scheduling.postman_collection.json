@@ -1,0 +1,607 @@
+{
+  "info": {
+    "_postman_id": "f4a7c9e1-3b6d-4e2a-8c5f-9a1d7b3e6c42",
+    "name": "TC3 - Scheduling Service (REST + JWT) - Completa",
+    "description": "Testa todas as operacoes REST do scheduling-service e as regras de autorizacao/negocio por role.\n\nComo usar:\n1. Suba os servicos: `docker compose up --build auth-service scheduling-service`.\n2. Rode a pasta '0 - Tokens JWT' inteira uma vez. Ela grava doctorToken / nurseToken / patientToken.\n3. Rode as demais pastas em ordem (0 -> 8). Cada pasta depende de estado criado pelas anteriores (ids de consulta salvos em variaveis da collection).\n\nEndpoints: {{baseUrl}}/appointments | {{baseUrl}}/appointments/{id} | {{baseUrl}}/appointments/{id}/status | {{baseUrl}}/appointments/me | {{baseUrl}}/availability\n\nRegras exercitadas:\n- create: DOCTOR ou NURSE\n- update (PUT, reagendar): somente DOCTOR; so altera dateTime/notes, patientId/doctorId sao ignorados\n- updateStatus (PATCH /status): DOCTOR ou NURSE; nao pode mudar consulta ja CANCELLED/COMPLETED; nao pode voltar para SCHEDULED\n- getAll / getById: DOCTOR ou NURSE\n- /me: somente PATIENT, retorna so as consultas do proprio subject do JWT\n- /availability: DOCTOR, NURSE ou PATIENT\n- patientId deve ser um usuario com role PATIENT; doctorId deve ser um usuario com role DOCTOR\n- antecedencia minima de 3 dias pra marcar consulta\n- conflito: nao pode marcar 2 consultas do mesmo medico com menos de 1h de diferenca (consultas CANCELLED nao contam)\n- disponibilidade deve excluir os horarios dentro dessa mesma janela de 1h, nao so o horario exato",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "authBaseUrl", "value": "http://localhost:8080", "type": "string"},
+    {"key": "baseUrl", "value": "http://localhost:8081", "type": "string"},
+    {"key": "patientId", "value": "3", "type": "string"},
+    {"key": "doctorId", "value": "1", "type": "string"},
+    {"key": "doctorToken", "value": "", "type": "string"},
+    {"key": "nurseToken", "value": "", "type": "string"},
+    {"key": "patientToken", "value": "", "type": "string"},
+    {"key": "apt1Id", "value": "", "type": "string"},
+    {"key": "apt2Id", "value": "", "type": "string"},
+    {"key": "apt3Id", "value": "", "type": "string"},
+    {"key": "apt4Id", "value": "", "type": "string"}
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Todas as datas em ISO-8601 sem timezone (formato aceito por LocalDateTime.parse),",
+          "// sempre >= 3 dias no futuro pra passar na regra de antecedencia minima.",
+          "const pad = n => String(n).padStart(2, '0');",
+          "function isoNoZone(d) {",
+          "  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;",
+          "}",
+          "function atDaysHour(days, hour, minute) {",
+          "  const d = new Date();",
+          "  d.setDate(d.getDate() + days);",
+          "  d.setHours(hour, minute || 0, 0, 0);",
+          "  return d;",
+          "}",
+          "",
+          "const apt1 = atDaysHour(10, 10, 0);   // consulta que sera cancelada",
+          "const apt2 = atDaysHour(11, 10, 0);   // consulta que sera concluida (COMPLETED)",
+          "const apt3 = atDaysHour(13, 10, 0);   // consulta usada so pra checar disponibilidade",
+          "const apt4 = atDaysHour(14, 10, 0);   // consulta usada pra reagendar (PUT)",
+          "",
+          "pm.collectionVariables.set('apt1DateTime', isoNoZone(apt1));",
+          "pm.collectionVariables.set('apt2DateTime', isoNoZone(apt2));",
+          "pm.collectionVariables.set('apt3DateTime', isoNoZone(apt3));",
+          "pm.collectionVariables.set('apt4DateTime', isoNoZone(apt4));",
+          "",
+          "// 30 min depois do apt1 -> dentro da janela de 1h de conflito",
+          "pm.collectionVariables.set('conflictDateTime', isoNoZone(new Date(apt1.getTime() + 30*60*1000)));",
+          "// 4h depois do apt1, mesmo dia -> fora da janela de conflito, usado nos testes de patientId/doctorId invalidos",
+          "pm.collectionVariables.set('farDateTime', isoNoZone(atDaysHour(10, 14, 0)));",
+          "// so 1 dia no futuro -> viola a antecedencia minima de 3 dias",
+          "pm.collectionVariables.set('soonDateTime', isoNoZone(atDaysHour(1, 9, 0)));",
+          "// novo horario pra reagendar o apt4 (ainda >= 3 dias no futuro)",
+          "pm.collectionVariables.set('rescheduleDateTime', isoNoZone(atDaysHour(15, 9, 0)));",
+          "",
+          "// data (sem hora) do apt3, usada na consulta de disponibilidade",
+          "pm.collectionVariables.set('availabilityDate', `${apt3.getFullYear()}-${pad(apt3.getMonth()+1)}-${pad(apt3.getDate())}`);",
+          "// apt3 e' as 10:00 -> janela de conflito e' [09:00, 11:00] inclusive",
+          "pm.collectionVariables.set('blockedSlot1', '09:00:00');",
+          "pm.collectionVariables.set('blockedSlot2', '11:00:00');",
+          "pm.collectionVariables.set('freeSlotNear', '08:00:00');",
+          "pm.collectionVariables.set('freeSlotFar', '14:00:00');"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0 - Tokens JWT",
+      "description": "Emite os tokens via auth-service (Basic Auth). Rode os 3 antes de qualquer outra pasta.",
+      "item": [
+        {
+          "name": "Token - Medico (dr.silva)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Retorna JWT Bearer', () => { pm.expect(body.tokenType).to.eql('Bearer'); pm.expect(body.accessToken).to.be.a('string'); });",
+            "pm.collectionVariables.set('doctorToken', body.accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "dr.silva", "type": "string"}, {"key": "password", "value": "doctor123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        },
+        {
+          "name": "Token - Enfermeiro (nurse.souza)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('nurseToken', pm.response.json().accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "nurse.souza", "type": "string"}, {"key": "password", "value": "nurse123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        },
+        {
+          "name": "Token - Paciente (patient.jose)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('patientToken', pm.response.json().accessToken);"
+          ]}}],
+          "request": {
+            "auth": {"type": "basic", "basic": [{"key": "username", "value": "patient.jose", "type": "string"}, {"key": "password", "value": "patient123", "type": "string"}]},
+            "method": "POST",
+            "url": "{{authBaseUrl}}/auth/token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 - Enfermeiro (NURSE)",
+      "item": [
+        {
+          "name": "Criar consulta 1 - sera cancelada (happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('Status SCHEDULED', () => pm.expect(body.status).to.eql('SCHEDULED'));",
+            "pm.collectionVariables.set('apt1Id', body.id);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{apt1DateTime}}\",\n  \"notes\": \"consulta 1 - sera cancelada\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar consulta 2 - sera concluida (happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('apt2Id', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{apt2DateTime}}\",\n  \"notes\": \"consulta 2 - sera concluida\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar consulta 3 - so p/ disponibilidade (happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('apt3Id', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{apt3DateTime}}\",\n  \"notes\": \"consulta 3 - teste de disponibilidade\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar consulta 4 - sera reagendada (happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('apt4Id', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{apt4DateTime}}\",\n  \"notes\": \"consulta 4 - sera reagendada\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Reagendar bloqueado para NURSE (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{apt4DateTime}}\",\n  \"notes\": \"tentativa bloqueada\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Validacoes de criacao (regras de negocio)",
+      "item": [
+        {
+          "name": "Criar com menos de 3 dias de antecedencia (erro 400)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita antecedencia minima', () => pm.expect(pm.response.json().detail).to.include('at least 3 days'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{soonDateTime}}\",\n  \"notes\": \"muito em cima da hora\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar com doctorId inexistente (erro 400)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita usuario inexistente', () => pm.expect(pm.response.json().detail).to.include('does not correspond to any registered user'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": 999,\n  \"dateTime\": \"{{farDateTime}}\",\n  \"notes\": \"medico inexistente\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar com doctorId de papel errado (erro 400)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita role errado', () => pm.expect(pm.response.json().detail).to.include('not a DOCTOR'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{patientId}},\n  \"dateTime\": \"{{farDateTime}}\",\n  \"notes\": \"doctorId na verdade eh paciente\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar com patientId de papel errado (erro 400)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita role errado', () => pm.expect(pm.response.json().detail).to.include('not a PATIENT'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{doctorId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{farDateTime}}\",\n  \"notes\": \"patientId na verdade eh medico\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "Criar com conflito de horario (erro 409)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+            "pm.test('Mensagem cita conflito de 1h', () => pm.expect(pm.response.json().detail).to.include('within 1 hour'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{conflictDateTime}}\",\n  \"notes\": \"30min depois da consulta 1\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Gestao de status (cancelar / concluir)",
+      "item": [
+        {
+          "name": "Cancelar consulta 1 (NURSE, happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status CANCELLED', () => pm.expect(pm.response.json().status).to.eql('CANCELLED'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt1Id}}/status"
+          }
+        },
+        {
+          "name": "Cancelar de novo a consulta 1 (erro 400, ja cancelada)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita status atual', () => pm.expect(pm.response.json().detail).to.include('already CANCELLED'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt1Id}}/status"
+          }
+        },
+        {
+          "name": "Voltar consulta 1 cancelada para SCHEDULED (erro 400)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"SCHEDULED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt1Id}}/status"
+          }
+        },
+        {
+          "name": "Concluir consulta 2 (DOCTOR, happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status COMPLETED', () => pm.expect(pm.response.json().status).to.eql('COMPLETED'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"COMPLETED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt2Id}}/status"
+          }
+        },
+        {
+          "name": "Mudar status de novo na consulta 2 (erro 400, ja concluida)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem cita status atual', () => pm.expect(pm.response.json().detail).to.include('already COMPLETED'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt2Id}}/status"
+          }
+        },
+        {
+          "name": "Mudar status bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Medico (DOCTOR)",
+      "item": [
+        {
+          "name": "getAll",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Retorna lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "getById (consulta 4)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Id corresponde', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('apt4Id')));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}"
+          }
+        },
+        {
+          "name": "getById inexistente (404)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+            "pm.test('Mensagem cita nao encontrado', () => pm.expect(pm.response.json().detail).to.include('Appointment not found'));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "Reagendar consulta 4 (PUT, happy path)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('dateTime atualizado', () => pm.expect(body.dateTime).to.include(pm.collectionVariables.get('rescheduleDateTime').substring(0,10)));",
+            "pm.test('patientId/doctorId continuam os mesmos da consulta', () => {",
+            "  pm.expect(String(body.patientId)).to.eql(pm.collectionVariables.get('patientId'));",
+            "  pm.expect(String(body.doctorId)).to.eql(pm.collectionVariables.get('doctorId'));",
+            "});"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{rescheduleDateTime}}\",\n  \"notes\": \"reagendado pelo medico\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}"
+          }
+        },
+        {
+          "name": "Reagendar consulta inexistente (404)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{farDateTime}}\",\n  \"notes\": \"nao existe\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "GET /me bloqueado para MEDICO (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Disponibilidade",
+      "item": [
+        {
+          "name": "Disponibilidade sem token (401)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/availability?doctorId={{doctorId}}&date={{availabilityDate}}", "host": ["{{baseUrl}}"], "path": ["availability"], "query": [{"key": "doctorId", "value": "{{doctorId}}"}, {"key": "date", "value": "{{availabilityDate}}"}]}
+          }
+        },
+        {
+          "name": "Disponibilidade do medico (exclui janela de 1h da consulta 3)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const slots = pm.response.json()[0].availableSlots;",
+            "pm.test('Horario exato (10:00) esta bloqueado', () => pm.expect(slots).to.not.include('10:00:00'));",
+            "pm.test('1h antes (09:00) esta bloqueado', () => pm.expect(slots).to.not.include(pm.collectionVariables.get('blockedSlot1')));",
+            "pm.test('1h depois (11:00) esta bloqueado', () => pm.expect(slots).to.not.include(pm.collectionVariables.get('blockedSlot2')));",
+            "pm.test('2h antes (08:00) esta livre', () => pm.expect(slots).to.include(pm.collectionVariables.get('freeSlotNear')));",
+            "pm.test('4h depois (14:00) esta livre', () => pm.expect(slots).to.include(pm.collectionVariables.get('freeSlotFar')));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{nurseToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/availability?doctorId={{doctorId}}&date={{availabilityDate}}", "host": ["{{baseUrl}}"], "path": ["availability"], "query": [{"key": "doctorId", "value": "{{doctorId}}"}, {"key": "date", "value": "{{availabilityDate}}"}]}
+          }
+        },
+        {
+          "name": "Disponibilidade de todos os medicos (sem doctorId)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Retorna lista', () => pm.expect(pm.response.json()).to.be.an('array').with.length.above(0));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/availability?date={{availabilityDate}}", "host": ["{{baseUrl}}"], "path": ["availability"], "query": [{"key": "date", "value": "{{availabilityDate}}"}]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Paciente (PATIENT)",
+      "item": [
+        {
+          "name": "GET /me retorna somente consultas proprias",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Somente do proprio paciente', () => body.forEach(a => pm.expect(String(a.patientId)).to.eql(pm.collectionVariables.get('patientId'))));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments/me"
+          }
+        },
+        {
+          "name": "Disponibilidade permitida para PATIENT",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/availability?doctorId={{doctorId}}&date={{availabilityDate}}", "host": ["{{baseUrl}}"], "path": ["availability"], "query": [{"key": "doctorId", "value": "{{doctorId}}"}, {"key": "date", "value": "{{availabilityDate}}"}]}
+          }
+        },
+        {
+          "name": "getAll bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "create bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{farDateTime}}\",\n  \"notes\": \"tentativa paciente\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "reagendar bloqueado para PATIENT (403)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{patientToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"dateTime\": \"{{rescheduleDateTime}}\",\n  \"notes\": \"tentativa paciente\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Sem autenticacao",
+      "item": [
+        {
+          "name": "getAll sem token (401)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments"
+          }
+        },
+        {
+          "name": "getAll com token invalido (401)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "eyJhbGciOiJIUzI1NiJ9.invalido.assinatura", "type": "string"}]},
+            "method": "GET",
+            "url": "{{baseUrl}}/appointments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Limpeza (DOCTOR)",
+      "item": [
+        {
+          "name": "Cancelar consulta 3 (usada so p/ disponibilidade)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt3Id}}/status"
+          }
+        },
+        {
+          "name": "Cancelar consulta 4 (usada nos testes de reagendamento)",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{doctorToken}}", "type": "string"}]},
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": "{{baseUrl}}/appointments/{{apt4Id}}/status"
+          }
+        }
+      ]
+    }
+  ]
+}
