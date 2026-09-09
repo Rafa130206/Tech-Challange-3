@@ -2,6 +2,7 @@ package com.fiapon.scheduling.controller;
 
 import com.fiapon.scheduling.dto.appointment.AppointmentRequest;
 import com.fiapon.scheduling.dto.appointment.AppointmentResponse;
+import com.fiapon.scheduling.dto.appointment.AppointmentStatusRequest;
 import com.fiapon.scheduling.service.AppointmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +34,12 @@ public class AppointmentController {
     @PreAuthorize("hasRole('DOCTOR')")
     public AppointmentResponse update(@PathVariable UUID id, @RequestBody AppointmentRequest request) {
         return service.update(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE')")
+    public AppointmentResponse updateStatus(@PathVariable UUID id, @RequestBody AppointmentStatusRequest request) {
+        return service.updateStatus(id, request.status());
     }
 
     @GetMapping
